@@ -1,0 +1,9 @@
+# Core dependencies for beamline_helper_scripts IQM branch
+numpy>=1.21.0
+Pillow>=9.0.0
+matplotlib>=3.5.0
+
+# Q3/IQM analysis dependencies
+scipy>=1.7.0
+scikit-image>=0.19.0
+lmfit>=1.0.3
