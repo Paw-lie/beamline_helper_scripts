@@ -27,10 +27,10 @@ if errorlevel 1 (
 echo [2/4] Activating virtual environment...
 call venv\Scripts\activate.bat
 
-echo [3/4] Installing dependencies...
-pip install -r requirements.txt
+echo [3/4] Installing package in editable mode...
+pip install -e .
 if errorlevel 1 (
-    echo ERROR: Failed to install dependencies
+    echo ERROR: Failed to install package
     pause
     exit /b 1
 )

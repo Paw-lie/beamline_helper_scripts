@@ -8,12 +8,17 @@ import matplotlib.pyplot as plt
 
 # Import Q3 analysis modules for slice analysis
 try:
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'AiQuAM_270225'))
-    import Q3_dev_workspace
+    # Add parent directory to path to import AiQuAM_270225
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+    
+    from AiQuAM_270225 import Q3_dev_workspace
     Q3_AVAILABLE = True
-except ImportError:
+except (ImportError, AttributeError) as e:
     Q3_AVAILABLE = False
-    print("/!\\  Warning: Q3_dev_workspace module not available. Slice analysis will be disabled.")
+    print(f"⚠️  Warning: Q3_dev_workspace module not available: {e}")
+    print("    Slice analysis will be disabled.")
 
 # ---------------------------------------------
 # Beamline configuration
@@ -745,7 +750,7 @@ def create_scan_views(settings):
         vol_files = []
         for root, dirs, files in os.walk(scan_path):
             for f in files:
-                if f.endswith('.vol'):
+                if f.endswith('vol.vol'):
                     vol_files.append(os.path.join(root, f))
         if not vol_files:
             continue
@@ -1103,9 +1108,9 @@ def analyze_slices(settings, identifier=None):
                 comp_sig = result['composite_sigma']
                 
                 # Format output
-                cnr_str = f"{cnr:.4f}" if not np.isnan(cnr) else "NaN"
-                step_str = f"{step_sig:.6f}" if not np.isnan(step_sig) else "NaN"
-                comp_str = f"{comp_sig:.6f}" if not np.isnan(comp_sig) else "NaN"
+                cnr_str = f"{cnr:.3f}" if not np.isnan(cnr) else "NaN"
+                step_str = f"{step_sig:.3f}" if not np.isnan(step_sig) else "NaN"
+                comp_str = f"{comp_sig:.3f}" if not np.isnan(comp_sig) else "NaN"
                 
                 print(f"{scan_id:<60} {slice_name:<30} {cnr_str:>10} {step_str:>12} {comp_str:>12}")
                 

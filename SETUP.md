@@ -14,9 +14,9 @@ python -m venv venv
 .\venv\Scripts\Activate.ps1
 ```
 
-**3. Install dependencies:**
+**3. Install package in editable mode:**
 ```powershell
-pip install -r requirements.txt
+pip install -e .
 ```
 
 **4. Run:**
@@ -38,13 +38,24 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-**3. Install dependencies:**
+**3. Install package in editable mode:**
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
 **4. Run:**
 ```bash
+python beamline_helper_scripts/beamline_console_helper.py
+```
+
+---
+
+## Alternative: Install Dependencies Only
+
+If you prefer not to install the package:
+
+```bash
+pip install -r requirements.txt
 python beamline_helper_scripts/beamline_console_helper.py
 ```
 
@@ -57,6 +68,25 @@ This branch includes:
 - **Enhanced reconstruction tracking** with z-size reporting
 - **New `analyze_slices` command** for CNR and sigma calculations
 - **Multi-volume support** in reconstruction details
+
+---
+
+## Project Structure
+
+```
+beamline_helper_scripts_IQM_branch/
+├── beamline_helper_scripts/     # Main scripts package
+│   ├── __init__.py
+│   └── beamline_console_helper.py
+├── AiQuAM_270225/                # IQM analysis package
+│   ├── __init__.py
+│   ├── Q3_dev_workspace.py
+│   ├── Q3_open_source_image_processing_functions.py
+│   └── Q3_open_source_fit_two_half_gaussians.py
+├── requirements.txt
+├── setup.py
+└── README.md
+```
 
 ---
 
@@ -92,10 +122,11 @@ deactivate
 
 ## Troubleshooting
 
-**Q3_dev_workspace not found?**
-- Ensure `AiQuAM_270225/` folder is in the same parent directory as `beamline_helper_scripts/`
+**Q3_dev_workspace import errors?**
+- Make sure you're running from the project root directory
+- Try: `pip install -e .` to install in editable mode
 
-**Import errors?**
+**Missing dependencies?**
 - Re-run: `pip install -r requirements.txt`
 
 **Permission errors on Windows?**

@@ -24,10 +24,10 @@ fi
 echo "[2/4] Activating virtual environment..."
 source venv/bin/activate
 
-echo "[3/4] Installing dependencies..."
-pip install -r requirements.txt
+echo "[3/4] Installing package in editable mode..."
+pip install -e .
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to install dependencies"
+    echo "ERROR: Failed to install package"
     exit 1
 fi
 
