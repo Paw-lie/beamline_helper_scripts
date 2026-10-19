@@ -1008,6 +1008,118 @@ def scan_views(settings):
 # Main REPL Loop
 # ---------------------------------------------
 
+def get_vol_shape(vol_file, param_keys):
+    """Return (x, y, z) from the .vol.info file, or None if unavailable."""
+    info_file = vol_file + ".info"
+    if not os.path.isfile(info_file):
+        return None
+    params = parse_text_file(info_file)
+    try:
+        dims = []
+        for axis in ("x", "y", "z"):
+            key = f"vol_size_{axis}"
+            dims.append(int(params.get(param_keys.get(key, f"NUM_{axis.upper()}")) or params.get(f"NUM_{axis.upper()}") or params.get(key)))
+        return tuple(dims)
+    except Exception:
+        return None
+
+def float32_to_uint16(in_path, out_path, shape_xyz, vmin, vmax, chunk_slices=8):
+    """
+    Convert a float32 volume (x fastest in file) to uint16 using memmaps and
+    processing a few z-slices at a time, so memory use stays small.
+    Values in [vmin, vmax] map linearly to [0, 65535]; others are clipped.
+    """
+    nx, ny, nz = shape_xyz
+    src = np.memmap(in_path, dtype=np.float32, mode='r', shape=(nz, ny, nx))
+    dst = np.memmap(out_path, dtype=np.uint16, mode='w+', shape=(nz, ny, nx))
+    scale = 65535.0 / (vmax - vmin)
+    try:
+        for z in range(0, nz, chunk_slices):
+            chunk = np.array(src[z:z + chunk_slices], dtype=np.float32)
+            chunk -= vmin
+            chunk *= scale
+            np.rint(chunk, out=chunk)
+            np.clip(chunk, 0, 65535, out=chunk)
+            dst[z:z + chunk_slices] = chunk.astype(np.uint16)
+        dst.flush()
+    finally:
+        del src, dst
+
+def convert_to_uint16(settings, identifier=None):
+    """
+    Convert selected float32 .vol files to uint16 .raw files.
+    Requires an identifier selection, lists the volumes, asks for confirmation,
+    vmin and vmax, then converts one by one.
+    """
+    if not identifier:
+        print("Please provide a selection, e.g. 'to_uint16 X001'")
+        return
+    processed_root = settings.get("processed_data_path", "")
+    if not processed_root or not os.path.isdir(processed_root):
+        print("⚠️  Invalid processed data path.")
+        return
+    profile = get_beamline_profile(settings.get("beamline", ""))
+    param_keys = profile.get("param_keys", {})
+
+    jobs = []
+    for scan_id in sorted(d for d in os.listdir(processed_root)
+                          if os.path.isdir(os.path.join(processed_root, d)) and identifier in d):
+        for root, dirs, files in os.walk(os.path.join(processed_root, scan_id)):
+            for f in sorted(files):
+                if f.endswith('.vol') and not f.endswith('slice.vol'):
+                    vol_file = os.path.join(root, f)
+                    shape = get_vol_shape(vol_file, param_keys)
+                    if shape is None:
+                        print(f"⚠️  Could not determine shape for {vol_file}, skipping.")
+                        continue
+                    jobs.append((vol_file, shape))
+    if not jobs:
+        print(f"⚠️  No convertible .vol files found for '{identifier}'.")
+        return
+
+    print(f"\nVolumes to be converted ({len(jobs)}):")
+    for vol_file, (nx, ny, nz) in jobs:
+        print(f"  {os.path.basename(vol_file)}  ({nx}x{ny}x{nz})")
+
+    try:
+        if (prompt_input("Convert these volumes? (y/N)", "n") or "n").lower() != 'y':
+            print("Aborted.")
+            return
+        try:
+            vmin = float(prompt_input("vmin (required)"))
+            vmax = float(prompt_input("vmax (required)"))
+        except (TypeError, ValueError):
+            print("⚠️  vmin and vmax must be numbers. Aborting.")
+            return
+        if vmax <= vmin:
+            print("⚠️  vmax must be larger than vmin. Aborting.")
+            return
+        out_dir = prompt_input("Output folder", settings.get("views_folder") or os.path.dirname(jobs[0][0]))
+        if not out_dir or not os.path.isdir(out_dir):
+            print("⚠️  Invalid output folder. Aborting.")
+            return
+
+        for i, (vol_file, (nx, ny, nz)) in enumerate(jobs, 1):
+            base = os.path.splitext(os.path.basename(vol_file))[0]
+            out_file = os.path.join(out_dir, f"{base}_vmin_{vmin:g}_vmax_{vmax:g}_uint16_{nx}x{ny}x{nz}.raw")
+            print(f"[{i}/{len(jobs)}] {os.path.basename(vol_file)} -> {out_file}")
+            if os.path.isfile(out_file):
+                print("  Already exists, skipping.")
+                continue
+            expected = nx * ny * nz * 4
+            if os.path.getsize(vol_file) < expected:
+                print("  ⚠️  File smaller than expected from info file, skipping.")
+                continue
+            try:
+                float32_to_uint16(vol_file, out_file, (nx, ny, nz), vmin, vmax)
+                print("  Done.")
+            except Exception as e:
+                print(f"  ⚠️  Error: {e}")
+                if os.path.isfile(out_file):
+                    os.remove(out_file)
+    except KeyboardInterrupt:
+        print("\n⏹️  Conversion interrupted by user.")
+
 def main():
     settings = {}
     print("Welcome to the workflow shell. Type 'help' for commands. Ctrl+D to quit.")
@@ -1057,12 +1169,15 @@ def main():
                     print(f"  {k}")
             print("  details <identifier>")
             print("  scan_views [identifier]")
+            print("  to_uint16 <identifier>")
             print("  help")
             print("  exit")
         elif cmd.startswith('scan_views'):
             parts = cmd.split(maxsplit=1)
             identifier = parts[1] if len(parts) > 1 else None
             create_ortho_slices(settings, identifier)
+        elif cmd == 'to_uint16' or cmd.startswith('to_uint16 '):
+            convert_to_uint16(settings, cmd[len('to_uint16'):].strip())
         elif cmd.startswith('details '):
             identifier = cmd.split(' ', 1)[1].strip()
             if identifier:
