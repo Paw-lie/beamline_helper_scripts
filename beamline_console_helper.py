@@ -1066,7 +1066,7 @@ def convert_to_uint16(settings, identifier=None):
                           if os.path.isdir(os.path.join(processed_root, d)) and identifier in d):
         for root, dirs, files in os.walk(os.path.join(processed_root, scan_id)):
             for f in sorted(files):
-                if f.endswith('.vol') and not f.endswith('slice.vol'):
+                if f.endswith('vol.vol'):
                     vol_file = os.path.join(root, f)
                     shape = get_vol_shape(vol_file, param_keys)
                     if shape is None:
