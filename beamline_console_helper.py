@@ -1101,7 +1101,7 @@ def convert_to_uint16(settings, identifier=None):
 
         for i, (vol_file, (nx, ny, nz)) in enumerate(jobs, 1):
             base = os.path.splitext(os.path.basename(vol_file))[0]
-            out_name = f"{base}_vmin_{vmin:g}_vmax_{vmax:g}_uint16_{nx}x{ny}x{nz}.raw".replace('-','m')
+            out_name = f"{base}_vmin_{vmin:g}_vmax_{vmax:g}_uint16_{nx}x{ny}x{nz}.raw".replace('-','m').replace('.','p')
             out_file = os.path.join(out_dir, out_name)
             print(f"[{i}/{len(jobs)}] {os.path.basename(vol_file)} -> {out_file}")
             if os.path.isfile(out_file):
