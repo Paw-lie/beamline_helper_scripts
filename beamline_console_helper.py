@@ -1048,8 +1048,8 @@ def float32_to_uint16(in_path, out_path, shape_xyz, vmin, vmax, chunk_slices=8):
 def convert_to_uint16(settings, identifier=None):
     """
     Convert selected float32 .vol files to uint16 .raw files.
-    Requires an identifier selection, lists the volumes, asks for confirmation,
-    vmin and vmax, then converts one by one.
+    Requires an identifier selection and conversion settings, lists only volumes
+    whose matching uint16 outputs are missing, then converts them one by one.
     """
     if not identifier:
         print("Please provide a selection, e.g. 'to_uint16 X001'")
@@ -1061,7 +1061,7 @@ def convert_to_uint16(settings, identifier=None):
     profile = get_beamline_profile(settings.get("beamline", ""))
     param_keys = profile.get("param_keys", {})
 
-    jobs = []
+    source_jobs = []
     for scan_id in sorted(d for d in os.listdir(processed_root)
                           if os.path.isdir(os.path.join(processed_root, d)) and identifier in d):
         for root, dirs, files in os.walk(os.path.join(processed_root, scan_id)):
@@ -1072,19 +1072,12 @@ def convert_to_uint16(settings, identifier=None):
                     if shape is None:
                         print(f"⚠️  Could not determine shape for {vol_file}, skipping.")
                         continue
-                    jobs.append((vol_file, shape))
-    if not jobs:
+                    source_jobs.append((vol_file, shape))
+    if not source_jobs:
         print(f"⚠️  No convertible .vol files found for '{identifier}'.")
         return
 
-    print(f"\nVolumes to be converted ({len(jobs)}):")
-    for vol_file, (nx, ny, nz) in jobs:
-        print(f"  {os.path.basename(vol_file)}  ({nx}x{ny}x{nz})")
-
     try:
-        if (prompt_input("Convert these volumes? (y/N)", "n") or "n").lower() != 'y':
-            print("Aborted.")
-            return
         try:
             vmin = float(prompt_input("vmin (required)"))
             vmax = float(prompt_input("vmax (required)"))
@@ -1094,15 +1087,34 @@ def convert_to_uint16(settings, identifier=None):
         if vmax <= vmin:
             print("⚠️  vmax must be larger than vmin. Aborting.")
             return
-        out_dir = prompt_input("Output folder", settings.get("views_folder") or os.path.dirname(jobs[0][0]))
+        out_dir = prompt_input("Output folder", settings.get("views_folder") or os.path.dirname(source_jobs[0][0]))
         if not out_dir or not os.path.isdir(out_dir):
             print("⚠️  Invalid output folder. Aborting.")
             return
 
-        for i, (vol_file, (nx, ny, nz)) in enumerate(jobs, 1):
+        jobs = []
+        for vol_file, shape in source_jobs:
+            nx, ny, nz = shape
             base = os.path.splitext(os.path.basename(vol_file))[0]
             out_name = f"{base}_vmin_{vmin:g}_vmax_{vmax:g}_uint16_{nx}x{ny}x{nz}.raw".replace('-','m').replace('.','p')
             out_file = os.path.join(out_dir, out_name)
+            if os.path.isfile(out_file):
+                continue
+            jobs.append((vol_file, shape, out_file))
+
+        if not jobs:
+            print("All matching 16-bit outputs already exist; nothing to convert.")
+            return
+
+        print(f"\nVolumes to be converted ({len(jobs)}):")
+        for vol_file, (nx, ny, nz), _ in jobs:
+            print(f"  {os.path.basename(vol_file)}  ({nx}x{ny}x{nz})")
+
+        if (prompt_input("Convert these volumes? (y/N)", "n") or "n").lower() != 'y':
+            print("Aborted.")
+            return
+
+        for i, (vol_file, (nx, ny, nz), out_file) in enumerate(jobs, 1):
             print(f"[{i}/{len(jobs)}] {os.path.basename(vol_file)} -> {out_file}")
             if os.path.isfile(out_file):
                 print("  Already exists, skipping.")

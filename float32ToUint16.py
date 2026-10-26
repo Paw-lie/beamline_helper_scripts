@@ -2,12 +2,17 @@
 
 Values in [vmin, vmax] are linearly mapped to [0, 65535]; values outside are clipped.
 """
+import os
 import numpy as np
 
 
 def float32_to_uint16(in_path, out_path, shape, vmin, vmax, chunk_slices=16):
     """shape = (z, y, x); the raw file is read via np.memmap and written via a
     second memmap, so only `chunk_slices` slices are held in RAM at a time."""
+    if os.path.exists(out_path):
+        print(f"16-bit output already exists; skipping conversion: {out_path}")
+        return
+
     if vmax <= vmin:
         raise ValueError("vmax must be larger than vmin")
     src = np.memmap(in_path, dtype=np.float32, mode="r", shape=tuple(shape))
